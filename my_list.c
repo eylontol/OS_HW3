@@ -257,6 +257,8 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
         //unlock thread
         pthread_mutex_unlock(&(t->m_read));
         pthread_mutex_unlock(&(t->m_write));
+        
+        i++;
     }
     
     list->head = NULL;
