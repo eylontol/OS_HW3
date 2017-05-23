@@ -1,5 +1,6 @@
 
 #include <pthread.h>
+#include "my_list.h"
 
 #define start_list_func(l,status_p) \
                             do {    \
@@ -20,27 +21,35 @@
 
 #define list_for_each(l, t)         \
                             for(t = l->head; t; t = t->next)
+static void pthread_mutex_init_protect(pthread_mutex_t* mtx);
 
 typedef enum {FALSE, TRUE} bool;
 
-typedef struct Node_t Node;
-struct {
-    int key;
-    void *data;
-    Node *next;
+typedef struct {
+    int val;
     pthread_mutex_t m_read, m_write;
-}Node_t;
-
-struct {
-    Node *head;
-    int_secured size, nr_running;
-    bool_secured valid;
-}linked_list_t;
+}int_secured;
 
 typedef struct {
     bool val;
     pthread_mutex_t m_read, m_write;
 }bool_secured;
+
+typedef struct Node_t Node;
+struct Node_t{
+    int key;
+    void *data;
+    Node *next;
+    pthread_mutex_t m_read, m_write;
+};
+
+struct linked_list_t{
+    Node *head;
+    int_secured size, nr_running;
+    bool_secured valid;
+};
+
+
 
 static void init_bool_secured(bool_secured *p, bool val) {
     if (!p) return;
@@ -50,7 +59,7 @@ static void init_bool_secured(bool_secured *p, bool val) {
 }
 
 static bool get_bool_secured(bool_secured *p) {
-    if (!p) return false;
+    if (!p) return FALSE;
     int res;
     pthread_mutex_lock(&(p->m_write));
     res = p->val;
@@ -76,10 +85,7 @@ out:
     return status;
 }
 
-typedef struct {
-    int val;
-    pthread_mutex_t m_read, m_write;
-}int_secured;
+
 
 static void set_int_secured(int_secured *p, int val) {
     if (!p) return;
@@ -113,6 +119,17 @@ static void inc_int_secured(int_secured *p) {
     pthread_mutex_unlock(&(p->m_write));
 }
 
+
+static void pthread_mutex_init_protect(pthread_mutex_t* mtx){
+    pthread_mutexattr_t attr;
+    if (!mtx) return;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK_NP);
+    pthread_mutex_init(mtx, &attr);
+}
+
+
+
 static void dec_int_secured(int_secured *p) {
     if (!p) return;
     pthread_mutex_lock(&(p->m_read));
@@ -122,18 +139,13 @@ static void dec_int_secured(int_secured *p) {
     pthread_mutex_unlock(&(p->m_write));
 }
 
-static void pthread_mutex_init_protect(pthread_mutex_t* mtx){
-    pthread_mutexattr_t* attr;
-    if (!mtx) return;
-    pthread_mutexattr_init(attr, PTHREAD_PRIO_PROTECT);
-    pthread_mutex_init(mtx, attr);
-}
+
 
 void list_free(linked_list_t* list){
     if (!list) return;
-    if(!set_bool_secured(list->valid), FALSE) return;
-    while(get_int_secured(list->nr_running));
-    Node* prev = list->head, curr = list->head;
+    if(!set_bool_secured(&(list->valid), FALSE)) return;
+    while(get_int_secured(&(list->nr_running)));
+    Node* prev = list->head, *curr = list->head;
     do{
         curr = prev->next;
         free(prev);
@@ -150,23 +162,23 @@ int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
     start_list_func(list, &valid);
     if (!valid) goto out;
     if(list_find(list, key)) goto out_unlock;
-    new = malloc(sizeof(*new()));
+    new = (Node*)malloc(sizeof(*new));
     if (!new) goto out_unlock;
     new->key=key; new->data = data;
     pthread_mutex_init_protect(&(new->m_read));
     pthread_mutex_init_protect(&(new->m_write));
     if (!list->head || list->head->key > key){
-        new->next = list->head
+        new->next = list->head;
         list->head = new;
         res = 0;
-        inc_int_secured(list->size);
+        inc_int_secured(&(list->size));
         goto out_unlock;
     }
     while (curr->next && curr->next->key < key) curr = curr->next;
     new->next = curr->next;
     curr->next = new;
     res = 0;
-    inc_int_secured(list->size);
+    inc_int_secured(&(list->size));
 out_unlock:
     end_list_func(list);
 out:
@@ -189,7 +201,7 @@ out:
 }
 
 linked_list_t* list_alloc() {
-    linked_list_t *l = kmalloc(sizeof(*l));
+    linked_list_t *l = (linked_list_t*)malloc(sizeof(*l));
     if (!l)
         goto out;
     l->head = NULL;
@@ -239,7 +251,7 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
             temp = temp->next;
         
         temp->next = t;
-        inc_int_secured(((linked_list_t *)(*(arr + i % n)))->size);
+        inc_int_secured(&(((linked_list_t *)(*(arr + i % n)))->size));
         
         //unlock thread
         pthread_mutex_unlock(&(t->m_read));
@@ -290,14 +302,14 @@ lock_relevant_threads:
 remove:
         temp = t;
         // TODO: how to free data ?!
-        kfree(t);
+        free(t);
         if (prev)
-            prev->next = next;
+            prev->next = t->next;
         else
-            list->head = next;
+            list->head = t->next;
         dec_int_secured(&(list->size));
         
-lock_relevant_threads:
+unlock_relevant_threads:
         // unlock previous (if exists)
         if (prev) {
             pthread_mutex_unlock(&(prev->m_read));
@@ -328,7 +340,7 @@ int list_size(linked_list_t* list) {
     start_list_func(list, &res);
     if(!res)
         goto out;
-    res = get_int_secured((list->size));
+    res = get_int_secured((&(list->size)));
     end_list_func(list);
 out:
     return res;
@@ -387,6 +399,8 @@ out:
     
 }
 
+
+
 void list_batch(linked_list_t* list, int num_ops, op_t* ops)
 {
     bool valid = FALSE;
@@ -402,7 +416,7 @@ void list_batch(linked_list_t* list, int num_ops, op_t* ops)
             case REMOVE:
                 ops->result = list_remove(list, ops->key);
                 break;
-            case FIND:
+            case CONTAINS:
                 ops->result = list_find(list, ops->key);
                 break;
             case UPDATE:
@@ -421,3 +435,4 @@ out:
     return;
 }
 
+int main(){ return 0; }
