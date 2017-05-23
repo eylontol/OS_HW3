@@ -155,6 +155,8 @@ int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
     if (!list->head || list->head->key > key){
         new->next = list->head
         list->head = new;
+        res = 0;
+        inc_int_secured(list->size);
         goto out_unlock;
     }
     while (curr->next && curr->next->key < key) curr = curr->next;
