@@ -47,10 +47,10 @@ static bool get_bool_secured(int_secured *p) {
     return res;
 }
 
-static void set_bool_secured(int_secured *p) {
+static void set_bool_secured(int_secured *p, bool val) {
     if (!p) return;
     pthread_mutex_lock(&(p->m_write));
-    p->val = true;
+    p->val = val;
     pthread_mutex_unlock(&(p->m_write));
 }
 
