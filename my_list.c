@@ -59,6 +59,12 @@ typedef struct {
     pthread_mutex_t m_read, m_write;
 }int_secured;
 
+static void set_int_secured(int_secured *p, int val) {
+    if (!p) return;
+    pthread_mutex_lock(&(p->m_write));
+    p->val = val;
+    pthread_mutex_unlock(&(p->m_write));
+}
 static int get_int_secured(int_secured *p) {
     if (!p) return -1;
     int res;
@@ -88,9 +94,35 @@ static void dec_int_secured(int_secured *p) {
 
 #if 0
 // Eylon
-linked_list_t* list_alloc();
+linked_list_t* list_alloc() {
+    linked_list_t *l = kmalloc(sizeof(*l));
+    if (!l)
+        goto out;
+    l->head = NULL;
+    set_int_secured(&(l->size), 0);
+    set_int_secured(&(l->nr_running), 0);
+    set_bool_secured(&(l->valid), TRUE);
+out:
+    return l;
+}
+
 int list_split(linked_list_t* list, int n, linked_list_t** arr);
-int list_remove(linked_list_t* list, int key);
+int list_remove(linked_list_t* list, int key) {
+    
+    int status = 1;
+    if (!list || !list_find(list, key))
+        goto out;
+    
+    start_list_func(l, &status);
+    if (!status)
+        goto out;
+    
+    
+    
+    end_list_func(l);
+out:
+    return status;
+}
 int list_size(linked_list_t* list);
 int list_compute(linked_list_t* list, int key,
                  int (*compute_func) (void *), int* result);
@@ -102,3 +134,4 @@ int list_find(linked_list_t* list, int key);
 int list_update(linked_list_t* list, int key, void* data);
 void list_batch(linked_list_t* list, int num_ops, op_t* ops);
 #endif
+
