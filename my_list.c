@@ -102,3 +102,4 @@ int list_find(linked_list_t* list, int key);
 int list_update(linked_list_t* list, int key, void* data);
 void list_batch(linked_list_t* list, int num_ops, op_t* ops);
 #endif
+
