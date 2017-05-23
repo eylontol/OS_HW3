@@ -129,41 +129,42 @@ static void pthread_mutex_init_protect(pthread_mutex_t* mtx){
 
 void list_free(linked_list_t* list){
     if (!list) return;
-    /* if (mutex_try_lock(list->)) */
-    /* LOCK */
+    if(!set_bool_secured(list->valid)) return;
     while(get_int_secured(list->nr_running));
     Node* prev = list->head, curr = list->head;
     do{
         curr = prev->next;
-        kfree(prev);
+        free(prev);
         prev = curr;
     }while(prev);
-    kfree(list);
+    free(list);
 }
 
 int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
     bool valid;
     int res = 1;
-    Node* curr, new;
+    Node* curr, *new;
     start_list_func(list, &valid);
-    if (!valid || list_find(list, key)) goto end;
-    new = kmalloc(sizeof(*new()));
-    if (!new) goto end;
+    if (!valid) goto out;
+    if(list_find(list, key)) goto out_unlock;
+    new = malloc(sizeof(*new()));
+    if (!new) goto out_unlock;
     new->key=key; new->data = data;
     pthread_mutex_init_protect(&(new->m_read));
     pthread_mutex_init_protect(&(new->m_write));
     if (!list->head || list->head->key > key){
         new->next = list->head
         list->head = new;
-        goto end;
+        goto out_unlock;
     }
     while (curr->next && curr->next->key < key) curr = curr->next;
     new->next = curr->next;
     curr->next = new;
     res = 0;
     inc_int_secured(list->size);
-end:
+out_unlock:
     end_list_func(list);
+out:
     return res;
     
 }
@@ -172,12 +173,13 @@ int list_find(linked_list_t* list, int key){
     bool valid;
     int res = 0;
     start_list_func(list, &valid);
-    if (!valid) goto end;
+    if (!valid) goto out;
     Node* head = list->head;
     while(head && head->key < key) head = head->next;
     if (head && head->key == key) res = 1;
-end:
+out_unlock:
     end_list_func(list);
+out:
     return res;
 }
 
@@ -213,15 +215,61 @@ int list_remove(linked_list_t* list, int key) {
 out:
     return status;
 }
-int list_size(linked_list_t* list);
-int list_compute(linked_list_t* list, int key,
-                 int (*compute_func) (void *), int* result);
 
-// Yuval
-void list_free(linked_list_t* list);
-int list_insert(linked_list_t* list, int key, void* data);
-int list_find(linked_list_t* list, int key);
-int list_update(linked_list_t* list, int key, void* data);
-void list_batch(linked_list_t* list, int num_ops, op_t* ops);
-#endif
+int list_update(linked_list_t* list, int key, void* data)
+{
+    bool valid = FALSE;
+    int res = 1;
+    Node* curr;
+    start_list_func(list, &valid);
+    if (valid == FALSE) goto out;
+    curr = list->head;
+    while (curr){
+        if (curr->key == key){
+            curr->data = data;
+            res = 0;
+            goto out_unlock;
+        }
+    }
+out_unlock:
+    end_list_func(list);
+out:
+    return res;
+    
+}
+
+void list_batch(linked_list_t* list, int num_ops, op_t* ops)
+{
+    bool valid = FALSE;
+    int tmp = 0;
+    start_list_func(list, &valid);
+    if (valid == FALSE) goto out;
+    if (num_ops <= 0) goto out_unlock;
+    while (num_ops-- > 0){
+        switch(ops->op){
+            case INSERT:
+                ops->result = list_insert(list, ops->key, ops->data);
+                break;
+            case REMOVE:
+                ops->result = list_remove(list, ops->key);
+                break;
+            case FIND:
+                ops->result = list_find(list, ops->key);
+                break;
+            case UPDATE:
+                ops->result = list_update(list, ops->key, ops->data);
+                break;
+            case COMPUTE:
+                ops->result = list_compute(list,ops->key, ops->compute_func, &tmp);
+                if (ops->result == 0) ops->result = tmp;
+                break;
+        }
+        ops++;
+    }
+out_unlock:
+    end_list_func(list);
+out:
+    return;
+}
+
 
