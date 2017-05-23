@@ -49,8 +49,6 @@ struct linked_list_t{
     bool_secured valid;
 };
 
-
-
 static void init_bool_secured(bool_secured *p, bool val) {
     if (!p) return;
     p->val = val;
@@ -144,7 +142,7 @@ static void dec_int_secured(int_secured *p) {
 void list_free(linked_list_t* list){
     if (!list) return;
     if(!set_bool_secured(&(list->valid), FALSE)) return;
-    while(get_int_secured(&(list->nr_running)));
+    while(get_int_secured(&(list->nr_running)) != 1);
     Node* prev = list->head, *curr = list->head;
     do{
         curr = prev->next;
@@ -226,11 +224,13 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
     if (!set_bool_secured(&(list->valid), FALSE))
         goto out_unlock;
     
+    while(get_int_secured(&(list->nr_running)) != 1);
+    
     // init lists
     for (i = 0; i < n; ++i) {
         *(arr + i) = list_alloc();
         if (!*(arr + i)) {
-            while (--i)
+            while (i--)
                 list_free(*(arr + i));
             goto out_unlock;
         }
@@ -247,6 +247,7 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
         pthread_mutex_lock(&(t->m_write));
         
         temp = ((linked_list_t *)(*(arr + i % n)))->head;
+        
         while (temp->next)
             temp = temp->next;
         
@@ -259,7 +260,6 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
     }
     
     list->head = NULL;
-    free(list);
     goto out;
 
 out_unlock:
@@ -285,6 +285,7 @@ int list_remove(linked_list_t* list, int key) {
             pthread_mutex_unlock(&(t->m_read));
             continue;
         }
+        
 lock_relevant_threads:
         // lock previous (if exists)
         if (prev) {
@@ -335,10 +336,11 @@ out:
 
 int list_size(linked_list_t* list) {
     int res = 0; // TODO: 0 or -1 ?
+    bool status = FALSE;
     if (!list)
         goto out;
-    start_list_func(list, &res);
-    if(!res)
+    start_list_func(list, &status);
+    if(!status)
         goto out;
     res = get_int_secured((&(list->size)));
     end_list_func(list);
@@ -347,7 +349,7 @@ out:
 }
 int list_compute(linked_list_t* list, int key,
                  int (*compute_func) (void *), int* result) {
-    int status = 1;
+    bool status = FALSE;
     if (!list || !compute_func || !result || !list_find(list, key))
         goto out;
     
@@ -355,7 +357,7 @@ int list_compute(linked_list_t* list, int key,
     if (!status)
         goto out;
     
-    status = 0;
+    status = TRUE;
     
     Node *t;
     list_for_each(list, t) {
@@ -374,7 +376,7 @@ int list_compute(linked_list_t* list, int key,
         goto out;
     }
 out:
-    return status;
+    return status == TRUE ? 0 : 1;
 }
 
 int list_update(linked_list_t* list, int key, void* data)
@@ -391,12 +393,12 @@ int list_update(linked_list_t* list, int key, void* data)
             res = 0;
             goto out_unlock;
         }
+        curr = curr->next;
     }
 out_unlock:
     end_list_func(list);
 out:
     return res;
-    
 }
 
 
@@ -435,4 +437,7 @@ out:
     return;
 }
 
-int main(){ return 0; }
+int main(){
+    
+    return 0;
+}
