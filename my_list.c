@@ -4,11 +4,11 @@
 #define start_list_func(l,status_p) \
                             do {    \
                                 if (!l || !get_bool_secured(&(l->valid))){\
-                                    *status_p = 0;         \
+                                    *status_p = FALSE;         \
                                     break;          \
                                 }                   \
                                 inc_int_secured(&(l->nr_running));  \
-                                *status_p = 1;             \
+                                *status_p = TRUE;             \
                             }while(0)
 
 
@@ -18,6 +18,8 @@
                                 if(l) dec_int_secured(&(l->nr_running));  \
                             }while(0)
 
+#define list_for_each(l, t)         \
+                            for(t = l->head; t; t = t->next)
 
 typedef enum {FALSE, TRUE} bool;
 
@@ -144,7 +146,7 @@ void list_free(linked_list_t* list){
 int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
     bool valid;
     int res = 1;
-    Node* curr, new;
+    Node *curr, *new;
     start_list_func(list, &valid);
     if (!valid || list_find(list, key)) goto end;
     new = kmalloc(sizeof(*new()));
@@ -185,7 +187,7 @@ end:
 #if 0
 // Eylon
 linked_list_t* list_alloc() {
-    linked_list_t *l = malloc(sizeof(*l));
+    linked_list_t *l = kmalloc(sizeof(*l));
     if (!l)
         goto out;
     l->head = NULL;
@@ -199,29 +201,111 @@ out:
 int list_split(linked_list_t* list, int n, linked_list_t** arr);
 int list_remove(linked_list_t* list, int key) {
     
-    int status = 1;
+    bool status = FALSE;
     if (!list || !list_find(list, key))
         goto out;
     
-    start_list_func(l, &status);
+    start_list_func(list, &status);
     if (!status)
         goto out;
     
+    Node *t, *prev = NULL;
+    list_for_each(list, t) {
+        pthread_mutex_lock(&(t->m_read));
+        if (!(t->key == key)){
+            pthread_mutex_unlock(&(t->m_read));
+            continue;
+        }
+lock_relevant_threads:
+        // lock previous (if exists)
+        if (prev) {
+            pthread_mutex_lock(&(prev->m_read));
+            pthread_mutex_lock(&(prev->m_write));
+        }
+        // lock next (if exists)
+        if (t->next) {
+            pthread_mutex_lock(&(t->next->m_read));
+            pthread_mutex_lock(&(t->next->m_write));
+        }
+        // lock current
+        pthread_mutex_lock(&(t->m_write));
+        
+remove:
+        linked_list_t *temp = t;
+        // TODO: how to free data ?!
+        kfree(t);
+        if (prev)
+            prev->next = next;
+        else
+            list->head = next;
+        dec_int_secured(&(list->size));
+        
+lock_relevant_threads:
+        // unlock previous (if exists)
+        if (prev) {
+            pthread_mutex_unlock(&(prev->m_read));
+            pthread_mutex_unlock(&(prev->m_write));
+        }
+        // unlock next (if exists)
+        if (t->next) {
+            pthread_mutex_unlock(&(t->next->m_read));
+            pthread_mutex_unlock(&(t->next->m_write));
+        }
+        // unlock current
+        pthread_mutex_unlock(&(t->m_write));
+        pthread_mutex_unlock(&(t->m_read));
+        
+        // smart
+        prev = t;
+    }
     
+    end_list_func(list);
+out:
+    return status == TRUE ? 0 : 1;
+}
+
+int list_size(linked_list_t* list) {
+    int res = 0; // TODO: 0 or -1 ?
+    if (!list)
+        goto out;
+    start_list_func(list, &res);
+    if(!res)
+        goto out;
+    res = get_int_secured((list->size));
+    end_list_func(list);
+out:
+    return res;
+}
+int list_compute(linked_list_t* list, int key,
+                 int (*compute_func) (void *), int* result) {
+    int status = 1;
+    if (!list || !compute_func || !result || !list_find(list, key))
+        goto out;
     
-    end_list_func(l);
+    start_list_func(list, &status);
+    if (!status)
+        goto out;
+    
+    status = 0;
+    
+    Node *t;
+    list_for_each(list, t) {
+        pthread_mutex_lock(&(t->m_read));
+        if (!(t->key == key)){
+            pthread_mutex_unlock(&(t->m_read));
+            continue;
+        }
+        pthread_mutex_lock(&(t->m_write));
+        
+        *result = compute_func(t->data);
+        
+        pthread_mutex_unlock(&(t->m_read));
+        pthread_mutex_unlock(&(t->m_write));
+        
+        goto out;
+    }
 out:
     return status;
 }
-int list_size(linked_list_t* list);
-int list_compute(linked_list_t* list, int key,
-                 int (*compute_func) (void *), int* result);
-
-// Yuval
-void list_free(linked_list_t* list);
-int list_insert(linked_list_t* list, int key, void* data);
-int list_find(linked_list_t* list, int key);
-int list_update(linked_list_t* list, int key, void* data);
-void list_batch(linked_list_t* list, int num_ops, op_t* ops);
 #endif
 
