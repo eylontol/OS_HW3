@@ -131,7 +131,7 @@ static void pthread_mutex_init_protect(pthread_mutex_t* mtx){
 
 void list_free(linked_list_t* list){
     if (!list) return;
-    if(!set_bool_secured(list->valid)) return;
+    if(!set_bool_secured(list->valid), FALSE) return;
     while(get_int_secured(list->nr_running));
     Node* prev = list->head, curr = list->head;
     do{
