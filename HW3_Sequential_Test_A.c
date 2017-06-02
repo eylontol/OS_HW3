@@ -254,6 +254,7 @@ bool testSequential2(){
 	ASSERT_ZERO(list_insert(list1,22,"Bran"));
 	ASSERT_ZERO(list_insert(list1,11,"Rickon"));
 	ASSERT_ZERO(list_insert(list1,33,"Robb"));
+    
 
 	ASSERT_ZERO(list_insert(list2,444,"Joffrey"));
 	ASSERT_ZERO(list_insert(list2,333,"Tommen"));
@@ -274,6 +275,7 @@ bool testSequential2(){
 	ASSERT_TEST(result == 2);
 	ASSERT_ZERO(list_compute(list3,1111,youComputeNothing,&result));
 	ASSERT_TEST(result == 2);
+    
 
 	ASSERT_ZERO(list_update(list1,11,"Rickon One Direction"));
 	ASSERT_ZERO(list_update(list1,33,"Robb Zombie"));
@@ -281,6 +283,8 @@ bool testSequential2(){
 	ASSERT_ZERO(list_update(list2,222,"Ty-win-ston churchill"));
 	ASSERT_ZERO(list_update(list2,444,"Joffrey I'll tell mother"));
 	ASSERT_ZERO(list_update(list3,1111,"Jorah in the zone"));
+
+    
 
 	ASSERT_ZERO(list_compute(list1,11,youComputeNothing,&result));
 	ASSERT_TEST(result == 8);
@@ -294,6 +298,7 @@ bool testSequential2(){
 	ASSERT_TEST(result == 6);
 	ASSERT_ZERO(list_compute(list3,1111,youComputeNothing,&result));
 	ASSERT_TEST(result == 6);
+    
 
 	list_free(list1);
 	list_free(list2);
@@ -303,7 +308,7 @@ bool testSequential2(){
 
 
 int main(){
-	RUN_TEST(testFreeErrors);
+//	RUN_TEST(testFreeErrors);
 //	RUN_TEST(testSplitErrors);
 //	RUN_TEST(testInsertErrors);
 //	RUN_TEST(testRemoveErrors);
@@ -312,7 +317,7 @@ int main(){
 //	RUN_TEST(testUpdateErrors);
 //	RUN_TEST(testComputeErrors);
 //	RUN_TEST(testBatchErrors);
-//	RUN_TEST(testSequential1);
+	RUN_TEST(testSequential1);
 //	RUN_TEST(testSequential2);
 
 	return 0;

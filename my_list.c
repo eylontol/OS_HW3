@@ -200,6 +200,7 @@ int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
         inc_int_secured(&(list->size));
         goto out_unlock;
     }
+    curr = list->head;
     while (curr->next && curr->next->key < key) curr = curr->next;
     new->next = curr->next;
     curr->next = new;
@@ -313,7 +314,7 @@ int list_remove(linked_list_t* list, int key) {
         pthread_mutex_lock(&(t->m_read));
         if (!(t->key == key)){
             pthread_mutex_unlock(&(t->m_read));
-            continue;
+            goto next;
         }
         
 lock_relevant_threads:
@@ -332,7 +333,10 @@ lock_relevant_threads:
         
 remove:
         temp = t;
-        // TODO: how to free data ?!
+        pthread_mutex_unlock(&(t->m_write));
+        pthread_mutex_unlock(&(t->m_read));
+        pthread_mutex_destroy(&(t->m_read));
+        pthread_mutex_destroy(&(t->m_write));
         free(t);
         if (prev)
             prev->next = t->next;
@@ -351,14 +355,11 @@ unlock_relevant_threads:
             pthread_mutex_unlock(&(t->next->m_read));
             pthread_mutex_unlock(&(t->next->m_write));
         }
-        // unlock current
-        pthread_mutex_unlock(&(t->m_write));
-        pthread_mutex_unlock(&(t->m_read));
-        
+next:
         // smart
         prev = t;
     }
-    
+out_unlock:
     end_list_func(list);
 out:
     return status == TRUE ? 0 : 1;
@@ -403,8 +404,10 @@ int list_compute(linked_list_t* list, int key,
         pthread_mutex_unlock(&(t->m_read));
         pthread_mutex_unlock(&(t->m_write));
         
-        goto out;
+        goto out_unlock;
     }
+out_unlock:
+    end_list_func(list);
 out:
     return status == TRUE ? 0 : 1;
 }
