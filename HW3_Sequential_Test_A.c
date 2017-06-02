@@ -215,8 +215,6 @@ bool testSequential1(){
 
 	ASSERT_ZERO(list_split(list1,n1,arr1)); // list1 is freed
     
-    return true;
-
     
 	ASSERT_TEST(list_size(arr1[0]) == numOfStarks); // arr1[0] is identical to list1 before list_split
     
@@ -314,17 +312,17 @@ bool testSequential2(){
 
 
 int main(){
-//	RUN_TEST(testFreeErrors);
-//	RUN_TEST(testSplitErrors);
-//	RUN_TEST(testInsertErrors);
-//	RUN_TEST(testRemoveErrors);
-//	RUN_TEST(testFindErrors);
-//	RUN_TEST(testSizeErrors);
-//	RUN_TEST(testUpdateErrors);
-//	RUN_TEST(testComputeErrors);
-//	RUN_TEST(testBatchErrors);
+	RUN_TEST(testFreeErrors);
+	RUN_TEST(testSplitErrors);
+	RUN_TEST(testInsertErrors);
+	RUN_TEST(testRemoveErrors);
+	RUN_TEST(testFindErrors);
+	RUN_TEST(testSizeErrors);
+	RUN_TEST(testUpdateErrors);
+	RUN_TEST(testComputeErrors);
+	RUN_TEST(testBatchErrors);
 	RUN_TEST(testSequential1);
-//	RUN_TEST(testSequential2);
+	RUN_TEST(testSequential2);
 
 	return 0;
 }

@@ -243,6 +243,7 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
     bool status = FALSE;
     int i;
     Node *t, *temp;
+    linked_list_t *temp_list;
     
     if (!list || !arr || n <= 0)
         goto out;
@@ -271,26 +272,16 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
     // insert
     list_for_each(list, t) {
         
-        // lock thread
-        pthread_mutex_lock(&(t->m_read));
-        pthread_mutex_lock(&(t->m_write));
+        temp_list = ((linked_list_t *)(*(arr + i % n)));
+        temp = temp_list->head;
         
-        temp = ((linked_list_t *)(*(arr + i % n)))->head;
-        
-        while (temp->next)
-            temp = temp->next;
-        
-        temp->next = t;
-        inc_int_secured(&(((linked_list_t *)(*(arr + i % n)))->size));
-        
-        //unlock thread
-        pthread_mutex_unlock(&(t->m_read));
-        pthread_mutex_unlock(&(t->m_write));
+        list_insert(temp_list, t->key, t->data);
         
         i++;
     }
     
-    list->head = NULL;
+    list_free(list);
+    
     goto out;
 
 out_unlock:
