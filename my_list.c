@@ -1,5 +1,6 @@
 
 #include <pthread.h>
+#include <stdlib.h>
 #include "my_list.h"
 
 #define start_list_func(l,status_p) \
@@ -439,7 +440,3 @@ out:
     return;
 }
 
-int main(){
-    
-    return 0;
-}
