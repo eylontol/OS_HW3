@@ -302,7 +302,7 @@ out:
 int list_remove(linked_list_t* list, int key) {
     
     bool status = FALSE;
-    Node *t, *prev = NULL, *temp;
+    Node *t, *prev = NULL, *next;
     if (!list || !list_find(list, key))
         goto out;
     
@@ -311,53 +311,74 @@ int list_remove(linked_list_t* list, int key) {
         goto out;
     
     list_for_each(list, t) {
-        pthread_mutex_lock(&(t->m_read));
-        if (!(t->key == key)){
-            pthread_mutex_unlock(&(t->m_read));
-            goto next;
-        }
         
-lock_relevant_threads:
+        next = t->next;
+        
         // lock previous (if exists)
         if (prev) {
-            pthread_mutex_lock(&(prev->m_read));
             pthread_mutex_lock(&(prev->m_write));
         }
+
         // lock next (if exists)
-        if (t->next) {
-            pthread_mutex_lock(&(t->next->m_read));
-            pthread_mutex_lock(&(t->next->m_write));
+        if (next) {
+            pthread_mutex_lock(&(next->m_read));
         }
-        // lock current
+        
+        
+        pthread_mutex_lock(&(t->m_read));
+        
+        if (!(t->key == key)){
+            if (prev) {
+                pthread_mutex_unlock(&(prev->m_write));
+            }
+            
+            // lock next (if exists)
+            if (next) {
+                pthread_mutex_unlock(&(next->m_read));
+            }
+            pthread_mutex_unlock(&(t->m_read));
+            prev = t;
+            continue;
+        }
+        
+        // lock write
+        
+        if (prev) {
+            pthread_mutex_lock(&(prev->m_write));
+        }
+        if (next) {
+            pthread_mutex_lock(&(next->m_write));
+        }
+        
         pthread_mutex_lock(&(t->m_write));
         
 remove:
-        temp = t;
-        pthread_mutex_unlock(&(t->m_write));
-        pthread_mutex_unlock(&(t->m_read));
+//        pthread_mutex_unlock(&(t->m_write));
+//        pthread_mutex_unlock(&(t->m_read));
         pthread_mutex_destroy(&(t->m_read));
         pthread_mutex_destroy(&(t->m_write));
         free(t);
+        
         if (prev)
-            prev->next = t->next;
+            prev->next = next;
         else
-            list->head = t->next;
+            list->head = next;
+        
         dec_int_secured(&(list->size));
         
-unlock_relevant_threads:
+        
         // unlock previous (if exists)
         if (prev) {
             pthread_mutex_unlock(&(prev->m_read));
             pthread_mutex_unlock(&(prev->m_write));
         }
         // unlock next (if exists)
-        if (t->next) {
-            pthread_mutex_unlock(&(t->next->m_read));
-            pthread_mutex_unlock(&(t->next->m_write));
+        if (next) {
+            pthread_mutex_unlock(&(next->m_read));
+            pthread_mutex_unlock(&(next->m_write));
         }
-next:
-        // smart
-        prev = t;
+        
+        goto out_unlock;
     }
 out_unlock:
     end_list_func(list);
