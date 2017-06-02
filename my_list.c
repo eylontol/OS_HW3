@@ -2,6 +2,9 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include "my_list.h"
+#include <stdio.h>
+#include <stdlib.h>
+
 
 #define start_list_func(l,status_p) \
                             do {    \
