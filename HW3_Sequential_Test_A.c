@@ -58,13 +58,9 @@ static int randRange(int end){
 }
 
 bool testFreeErrors(){
-    printf("0");
 	list_free(NULL);
-    printf("1");
 	linked_list_t* list = list_alloc();
-    printf("2");
 	list_free(list);
-    printf("3");
 
 	return true;
 }

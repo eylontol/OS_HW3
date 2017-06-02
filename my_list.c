@@ -60,6 +60,12 @@ static void init_bool_secured(bool_secured *p, bool val) {
     pthread_mutex_init_protect(&(p->m_write));
 }
 
+static void destroy_bool_secured(bool_secured *p) {
+    if (!p) return;
+    pthread_mutex_destroy(&(p->m_read));
+    pthread_mutex_destroy(&(p->m_write));
+}
+
 static bool get_bool_secured(bool_secured *p) {
     if (!p) return FALSE;
     int res;
@@ -103,6 +109,12 @@ static void init_int_secured(int_secured *p, int val) {
     pthread_mutex_init_protect(&(p->m_write));
 }
 
+static void destroy_int_secured(int_secured *p) {
+    if (!p) return;
+    pthread_mutex_destroy(&(p->m_read));
+    pthread_mutex_destroy(&(p->m_write));
+}
+
 static int get_int_secured(int_secured *p) {
     if (!p) return -1;
     int res;
@@ -144,16 +156,28 @@ static void dec_int_secured(int_secured *p) {
 
 
 void list_free(linked_list_t* list){
+    int valid;
+    
     if (!list) return;
+    
+    start_list_func(list, &valid);
+    if (!valid) return;
+    
     if(!set_bool_secured(&(list->valid), FALSE)) return;
     while(get_int_secured(&(list->nr_running)) != 1);
-    Node* prev = list->head, *curr = list->head;
-    do{
+    Node *prev = list->head, *curr = list->head;
+    while(prev){
         curr = prev->next;
+        pthread_mutex_destroy(&(prev->m_read));
+        pthread_mutex_destroy(&(prev->m_write));
         free(prev);
         prev = curr;
-    }while(prev);
+    }
+    destroy_int_secured(&(list->size));
+    destroy_int_secured(&(list->nr_running));
+    destroy_bool_secured(&(list->valid));
     free(list);
+//    end_list_func(list);
 }
 
 int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
