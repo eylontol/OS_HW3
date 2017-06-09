@@ -471,7 +471,7 @@ void list_batch(linked_list_t* list, int num_ops, op_t* ops)
                 break;
             case COMPUTE:
                 ops->result = list_compute(list,ops->key, ops->compute_func, &tmp);
-                *((int *)(ops->data)) = tmp;
+                ops->data = (void *)tmp;
                 break;
         }
         ops++;
