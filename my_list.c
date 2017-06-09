@@ -98,29 +98,27 @@ out:
     return status;
 }
 
-static void* call_func(void* _arg){
+int call_func(argToFunc* arg){
     int tmp;
-    int tmp2;
-    argToFunc* arg = (argToFunc *)_arg;
-    switch(((argToFunc *)arg)->op->op){
+    switch (((op_t *)(arg->op))->op){
         case INSERT:
-            arg->op->result = list_insert(arg->list, arg->op->key, arg->op->data);
+            ((op_t *)(arg->op))->result = list_insert(arg->list, ((op_t *)(arg->op))->key, ((op_t *)(arg->op))->data);
             break;
         case REMOVE:
-            arg->op->result = list_remove(arg->list, arg->op->key);
+            ((op_t *)(arg->op))->result = list_remove(arg->list, ((op_t *)(arg->op))->key);
             break;
         case CONTAINS:
-            arg->op->result = list_find(arg->list, arg->op->key);
+            ((op_t *)(arg->op))->result = list_find(arg->list, ((op_t *)(arg->op))->key);
             break;
         case UPDATE:
-            arg->op->result = list_update(arg->list, arg->op->key, arg->op->data);
+            ((op_t *)(arg->op))->result = list_update(arg->list, ((op_t *)(arg->op))->key, ((op_t *)(arg->op))->data);
             break;
         case COMPUTE:
-            arg->op->result = list_compute(arg->list,arg->op->key, arg->op->compute_func, &tmp);
-            arg->op->data = (void *)tmp;
+            ((op_t *)(arg->op))->result = list_compute(arg->list,((op_t *)(arg->op))->key, ((op_t *)(arg->op))->compute_func, &tmp);
+            ((op_t *)(arg->op))->data = (void *)tmp;
             break;
     }
-    return NULL;
+    return 0;
 }
 
 static void set_int_secured(int_secured *p, int val) {
@@ -245,7 +243,6 @@ int list_find(linked_list_t* list, int key){
     Node* head = list->head;
     while(head && head->key < key) head = head->next;
     if (head && head->key == key) res = 1;
-    else res = 0;
 out_unlock:
     end_list_func(list);
 out:
@@ -474,55 +471,38 @@ out:
     return res;
 }
 
-/*
-
 void list_batch(linked_list_t* list, int num_ops, op_t* ops)
 {
     bool valid = FALSE;
-    int tmp;
+    int i;
+    pthread_t *thread;
+    argToFunc *args;
+    
     start_list_func(list, &valid);
     if (valid == FALSE) goto out;
+    
     if (num_ops <= 0) goto out_unlock;
-    while (num_ops-- > 0){
-        switch(ops->op){
-            case INSERT:
-                ops->result = list_insert(list, ops->key, ops->data);
-                break;
-            case REMOVE:
-                ops->result = list_remove(list, ops->key);
-                break;
-            case CONTAINS:
-                ops->result = list_find(list, ops->key);
-                break;
-            case UPDATE:
-                ops->result = list_update(list, ops->key, ops->data);
-                break;
-            case COMPUTE:
-                ops->result = list_compute(list,ops->key, ops->compute_func, &tmp);
-                ops->data = (void *)tmp;
-                break;
-        }
-        ops++;
+    
+    thread = (pthread_t *)malloc (num_ops * sizeof(*thread));
+    if (!thread) goto out_unlock;
+    
+    args = (argToFunc *)malloc(num_ops * sizeof(*args));
+    if (!args) {
+        free(thread);
+        goto out_unlock;
     }
-out_unlock:
-    end_list_func(list);
-out:
-    return;
-}*/
 
-void list_batch(linked_list_t* list, int num_ops, op_t* ops)
-{
-    bool valid = FALSE;
-    int thread;
-    argToFunc args;
-    start_list_func(list, &valid);
-    args.list = list;
-    if (valid == FALSE) goto out;
-    if (num_ops <= 0) goto out_unlock;
-    while (num_ops-- > 0){
-        args.op = ops++;
-        pthread_create((pthread_t *)(&thread),NULL,call_func,&args);
+    for (i = 0; i < num_ops; i++) {
+        args[i].list = list;
+        args[i].op = &ops[i];
+        pthread_create(&thread[i], NULL, call_func, &args[i]);
     }
+    for (i = 0; i < num_ops; i++) {
+        pthread_join(thread[i], NULL);
+    }
+    
+    free (thread);
+    free (args);
 out_unlock:
     end_list_func(list);
 out:
