@@ -30,6 +30,11 @@ static void pthread_mutex_init_protect(pthread_mutex_t* mtx);
 typedef enum {FALSE, TRUE} bool;
 
 typedef struct {
+    op_t* op;
+    linked_list_t* list;
+}argToFunc;
+
+typedef struct {
     int val;
     pthread_mutex_t m_read, m_write;
 }int_secured;
@@ -93,7 +98,30 @@ out:
     return status;
 }
 
-
+static void* call_func(void* _arg){
+    int tmp;
+    int tmp2;
+    argToFunc* arg = (argToFunc *)_arg;
+    switch(((argToFunc *)arg)->op->op){
+        case INSERT:
+            arg->op->result = list_insert(arg->list, arg->op->key, arg->op->data);
+            break;
+        case REMOVE:
+            arg->op->result = list_remove(arg->list, arg->op->key);
+            break;
+        case CONTAINS:
+            arg->op->result = list_find(arg->list, arg->op->key);
+            break;
+        case UPDATE:
+            arg->op->result = list_update(arg->list, arg->op->key, arg->op->data);
+            break;
+        case COMPUTE:
+            arg->op->result = list_compute(arg->list,arg->op->key, arg->op->compute_func, &tmp);
+            arg->op->data = (void *)tmp;
+            break;
+    }
+    return NULL;
+}
 
 static void set_int_secured(int_secured *p, int val) {
     if (!p) return;
@@ -446,7 +474,7 @@ out:
     return res;
 }
 
-
+/*
 
 void list_batch(linked_list_t* list, int num_ops, op_t* ops)
 {
@@ -480,5 +508,23 @@ out_unlock:
     end_list_func(list);
 out:
     return;
-}
+}*/
 
+void list_batch(linked_list_t* list, int num_ops, op_t* ops)
+{
+    bool valid = FALSE;
+    int thread;
+    argToFunc args;
+    start_list_func(list, &valid);
+    args.list = list;
+    if (valid == FALSE) goto out;
+    if (num_ops <= 0) goto out_unlock;
+    while (num_ops-- > 0){
+        args.op = ops++;
+        pthread_create((pthread_t *)(&thread),NULL,call_func,&args);
+    }
+out_unlock:
+    end_list_func(list);
+out:
+    return;
+}
