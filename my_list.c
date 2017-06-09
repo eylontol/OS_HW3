@@ -14,17 +14,22 @@
                                 }                   \
                                 inc_int_secured(&(l->nr_running));  \
                                 *status_p = TRUE;             \
-                            }while(0)
+                            }while(0);
 
 
 
 #define end_list_func(l)    \
                             do {    \
                                 if(l) dec_int_secured(&(l->nr_running));  \
-                            }while(0)
+                            }while(0);
 
 #define list_for_each(l, t)         \
                             for(t = l->head; t; t = t->next)
+
+#define lock_node(n)        do {pthread_mutex_lock(&((n)->m));} while(0);
+
+#define unlock_node(n)      do {pthread_mutex_unlock(&((n)->m));} while(0);
+
 static void pthread_mutex_init_protect(pthread_mutex_t* mtx);
 
 typedef enum {FALSE, TRUE} bool;
@@ -49,7 +54,7 @@ struct Node_t{
     int key;
     void *data;
     Node *next;
-    pthread_mutex_t m_read, m_write;
+    pthread_mutex_t m;
 };
 
 struct linked_list_t{
@@ -182,16 +187,17 @@ static void dec_int_secured(int_secured *p) {
 
 void list_free(linked_list_t* list){
     bool valid;
+    Node *prev, *curr;
     if (!list) return;
     start_list_func(list, &valid);
     if (!valid) return;
     if(!set_bool_secured(&(list->valid), FALSE)) return;
     while(get_int_secured(&(list->nr_running)) != 1);
-    Node *prev = list->head, *curr = list->head;
+    prev = list->head;
+    curr = list->head;
     while(prev){
         curr = prev->next;
-        pthread_mutex_destroy(&(prev->m_read));
-        pthread_mutex_destroy(&(prev->m_write));
+        pthread_mutex_destroy(&(prev->m));
         free(prev);
         prev = curr;
     }
@@ -205,26 +211,60 @@ void list_free(linked_list_t* list){
 int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
     bool valid;
     int res = 1;
-    Node *curr, *new;
+    Node *curr, *new, *prev;
     start_list_func(list, &valid);
     if (!valid) goto out;
     if(list_find(list, key)) goto out_unlock;
     new = (Node*)malloc(sizeof(*new));
     if (!new) goto out_unlock;
-    new->key=key; new->data = data;
-    pthread_mutex_init_protect(&(new->m_read));
-    pthread_mutex_init_protect(&(new->m_write));
-    if (!list->head || list->head->key > key){
-        new->next = list->head;
+    new->key = key;
+    new->data = data;
+    new->next = NULL;
+    pthread_mutex_init_protect(&(new->m));
+    
+    lock_node(new);
+    
+    prev = NULL;
+    if (!(list->head)) {
         list->head = new;
-        res = 0;
-        inc_int_secured(&(list->size));
-        goto out_unlock;
+    }else {
+        curr = list->head;
+        lock_node(curr);
+        if (curr->key >= key) {
+            new->next = curr;
+            list->head = new;
+            unlock_node(curr);
+        }else {
+            while(curr) {
+                if (curr->key >= key) {
+                    
+                    new->next = curr;
+                    
+                    if (prev) {
+                        prev->next = new;
+                        unlock_node(prev);
+                    }
+                    unlock_node(curr);
+                    
+                    goto update_list;
+                }
+                
+                if(prev) unlock_node(prev);
+                
+                if (curr->next) lock_node(curr->next)
+                else {
+                    curr->next = new;
+                    unlock_node(curr);
+                    goto update_list;
+                }
+                
+                prev = curr;
+                curr = curr->next;
+            }
+        }
     }
-    curr = list->head;
-    while (curr->next && curr->next->key < key) curr = curr->next;
-    new->next = curr->next;
-    curr->next = new;
+update_list:
+    unlock_node(new);
     res = 0;
     inc_int_secured(&(list->size));
 out_unlock:
@@ -237,12 +277,29 @@ out:
 int list_find(linked_list_t* list, int key){
     bool valid;
     int res = -1;
+    Node* head;
     start_list_func(list, &valid);
     if (!valid) goto out;
+    
     res = 0;
-    Node* head = list->head;
-    while(head && head->key < key) head = head->next;
-    if (head && head->key == key) res = 1;
+    
+    if (!(list->head)) goto out_unlock;
+    
+    head = list->head;
+    lock_node(head);
+    
+    do{
+        if (head->key >= key) {
+            if (head->key == key) res = 1;
+            else res = 0;
+            unlock_node(head);
+            goto out_unlock;
+        }
+        unlock_node(head);
+        if (head->next) lock_node(head->next);
+        head = head->next;
+    }while (head);
+    
 out_unlock:
     end_list_func(list);
 out:
@@ -317,85 +374,46 @@ out:
 int list_remove(linked_list_t* list, int key) {
     
     bool status = FALSE;
-    Node *t, *prev = NULL, *next;
-    if (!list || !list_find(list, key))
+    Node *t, *prev = NULL, *next = NULL;
+    if (!list || !list_find(list, key) || !(list->head))
+    {
         goto out;
+    }
     
     start_list_func(list, &status);
     if (!status)
         goto out;
     
-    list_for_each(list, t) {
-        
+    t = list->head;
+    lock_node(t);
+    
+    while(t) {
         next = t->next;
         
-        // lock previous (if exists)
-        if (prev) {
-            pthread_mutex_lock(&(prev->m_write));
-        }
-
-        // lock next (if exists)
-        if (next) {
-            pthread_mutex_lock(&(next->m_read));
-        }
-        
-        
-
-        pthread_mutex_lock(&(t->m_read));
-        
-        if (!(t->key == key)){
-            if (prev) {
-                pthread_mutex_unlock(&(prev->m_write));
-            }
+        if (t->key == key) {
             
-            // lock next (if exists)
-            if (next) {
-                pthread_mutex_unlock(&(next->m_read));
-            }
-            pthread_mutex_unlock(&(t->m_read));
-            prev = t;
-            continue;
+            if (next) lock_node(next);
+            
+            if (prev) prev->next = next;
+            else list->head = next;
+            
+            pthread_mutex_destroy(&(t->m));
+            free(t);
+            dec_int_secured(&(list->size));
+            
+            if (prev) unlock_node(prev);
+            if (next) unlock_node(next);
+            
+            goto out_unlock;
         }
         
-        // lock write
+        if (prev) unlock_node(prev);
+        prev = t;
+        t = t->next;
+        if (!t) unlock_node(prev);
         
-        if (prev) {
-            pthread_mutex_lock(&(prev->m_write));
-        }
-        if (next) {
-            pthread_mutex_lock(&(next->m_write));
-        }
-        
-        pthread_mutex_lock(&(t->m_write));
-        
-remove:
-//        pthread_mutex_unlock(&(t->m_write));
-//        pthread_mutex_unlock(&(t->m_read));
-        pthread_mutex_destroy(&(t->m_read));
-        pthread_mutex_destroy(&(t->m_write));
-        free(t);
-        
-        if (prev)
-            prev->next = next;
-        else
-            list->head = next;
-        
-        dec_int_secured(&(list->size));
-        
-        
-        // unlock previous (if exists)
-        if (prev) {
-            pthread_mutex_unlock(&(prev->m_read));
-            pthread_mutex_unlock(&(prev->m_write));
-        }
-        // unlock next (if exists)
-        if (next) {
-            pthread_mutex_unlock(&(next->m_read));
-            pthread_mutex_unlock(&(next->m_write));
-        }
-        
-        goto out_unlock;
     }
+    
 out_unlock:
     end_list_func(list);
 out:
@@ -429,17 +447,15 @@ int list_compute(linked_list_t* list, int key,
     
     Node *t;
     list_for_each(list, t) {
-        pthread_mutex_lock(&(t->m_read));
+        lock_node(t);
         if (!(t->key == key)){
-            pthread_mutex_unlock(&(t->m_read));
+            unlock_node(t);
             continue;
         }
-        pthread_mutex_lock(&(t->m_write));
-        
+
         *result = compute_func(t->data);
         
-        pthread_mutex_unlock(&(t->m_read));
-        pthread_mutex_unlock(&(t->m_write));
+        unlock_node(t);
         
         goto out_unlock;
     }
@@ -503,6 +519,7 @@ void list_batch(linked_list_t* list, int num_ops, op_t* ops)
     
     free (thread);
     free (args);
+    
 out_unlock:
     end_list_func(list);
 out:
