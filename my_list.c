@@ -153,8 +153,6 @@ static void dec_int_secured(int_secured *p) {
     pthread_mutex_unlock(&(p->m_write));
 }
 
-
-
 void list_free(linked_list_t* list){
     int valid;
     
@@ -215,9 +213,10 @@ out:
 
 int list_find(linked_list_t* list, int key){
     bool valid;
-    int res = 0;
+    int res = -1;
     start_list_func(list, &valid);
     if (!valid) goto out;
+    res = 0;
     Node* head = list->head;
     while(head && head->key < key) head = head->next;
     if (head && head->key == key) res = 1;
@@ -377,8 +376,12 @@ out:
     return status == TRUE ? 0 : 1;
 }
 
+int eyyylon(){
+    return NULL;
+}
+
 int list_size(linked_list_t* list) {
-    int res = 0; // TODO: 0 or -1 ?
+    int res = -1;
     bool status = FALSE;
     if (!list)
         goto out;
@@ -451,7 +454,7 @@ out:
 void list_batch(linked_list_t* list, int num_ops, op_t* ops)
 {
     bool valid = FALSE;
-    int tmp = 0;
+    int tmp;
     start_list_func(list, &valid);
     if (valid == FALSE) goto out;
     if (num_ops <= 0) goto out_unlock;
@@ -471,7 +474,7 @@ void list_batch(linked_list_t* list, int num_ops, op_t* ops)
                 break;
             case COMPUTE:
                 ops->result = list_compute(list,ops->key, ops->compute_func, &tmp);
-                if (ops->result == 0) ops->result = tmp;
+                *((int *)(ops->data)) = tmp;
                 break;
         }
         ops++;
