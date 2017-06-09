@@ -115,6 +115,7 @@ static void destroy_int_secured(int_secured *p) {
     pthread_mutex_destroy(&(p->m_write));
 }
 
+
 static int get_int_secured(int_secured *p) {
     if (!p) return -1;
     int res;
@@ -156,13 +157,10 @@ static void dec_int_secured(int_secured *p) {
 
 
 void list_free(linked_list_t* list){
-    int valid;
-    
+    bool valid;
     if (!list) return;
-    
     start_list_func(list, &valid);
     if (!valid) return;
-    
     if(!set_bool_secured(&(list->valid), FALSE)) return;
     while(get_int_secured(&(list->nr_running)) != 1);
     Node *prev = list->head, *curr = list->head;
@@ -184,7 +182,6 @@ int list_insert(linked_list_t* list, int key, void* data){ /* null ok? */
     bool valid;
     int res = 1;
     Node *curr, *new;
-
     start_list_func(list, &valid);
     if (!valid) goto out;
     if(list_find(list, key)) goto out_unlock;
@@ -215,12 +212,13 @@ out:
 
 int list_find(linked_list_t* list, int key){
     bool valid;
-    int res = 0;
+    int res = 2;
     start_list_func(list, &valid);
     if (!valid) goto out;
     Node* head = list->head;
     while(head && head->key < key) head = head->next;
     if (head && head->key == key) res = 1;
+    else res = 0;
 out_unlock:
     end_list_func(list);
 out:
@@ -276,7 +274,9 @@ int list_split(linked_list_t* list, int n, linked_list_t** arr) {
         temp = temp_list->head;
         
         list_insert(temp_list, t->key, t->data);
+
         
+
         i++;
     }
     
@@ -316,6 +316,7 @@ int list_remove(linked_list_t* list, int key) {
         }
         
         
+
         pthread_mutex_lock(&(t->m_read));
         
         if (!(t->key == key)){
@@ -378,7 +379,7 @@ out:
 }
 
 int list_size(linked_list_t* list) {
-    int res = 0; // TODO: 0 or -1 ?
+    int res = -1;
     bool status = FALSE;
     if (!list)
         goto out;
@@ -470,8 +471,7 @@ void list_batch(linked_list_t* list, int num_ops, op_t* ops)
                 ops->result = list_update(list, ops->key, ops->data);
                 break;
             case COMPUTE:
-                ops->result = list_compute(list,ops->key, ops->compute_func, &tmp);
-                if (ops->result == 0) ops->result = tmp;
+                ops->result = list_compute(list,ops->key, ops->compute_func, list->data);
                 break;
         }
         ops++;
