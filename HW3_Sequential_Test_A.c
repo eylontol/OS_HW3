@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+
 #define LIST_FOR_EACH(list) for(int i = 0; i < list_size((list)) ; ++i)
 
 
@@ -58,9 +59,14 @@ static int randRange(int end){
 }
 
 bool testFreeErrors(){
+    printf("in testFreeErrors\n");
 	list_free(NULL);
+    printf("after free\n");
 	linked_list_t* list = list_alloc();
+    printf("after alloc\n");
 	list_free(list);
+    printf("after testFreeErrors\n");
+
 
 	return true;
 }
@@ -110,7 +116,7 @@ bool testRemoveErrors(){
 bool testFindErrors(){
 	linked_list_t* list = list_alloc();
 	int data = 42;
-//	ASSERT_TEST(list_find(NULL,1984) == 0);
+	ASSERT_TEST(list_find(NULL,1984) == 0);
 
 	ASSERT_TEST(list_find(list,1984) == 0);
 	list_free(list);
@@ -171,6 +177,7 @@ bool testSequential1(){
 	linked_list_t* list1 = list_alloc();
 	linked_list_t* list2 = list_alloc();
 	linked_list_t* list3 = list_alloc();
+    printf("after alloc\n");
 	int numOfStarks = 6 , numOfLannisters = 4;
 	int allStarks[6] = {66,22,55,11,44,33};  
 	int n1 = 1 ,n2 = 3, n3 = numOfLannisters;
@@ -178,34 +185,39 @@ bool testSequential1(){
 	linked_list_t* arr2[n2];
 	linked_list_t* arr3[numOfLannisters];
 	ASSERT_TEST(list_size(list1) == 0);
+    printf("after size\n");
 	ASSERT_ZERO(list_insert(list1,66,"Jon"));
 	ASSERT_ZERO(list_insert(list1,44,"Sansa"));
 	ASSERT_ZERO(list_insert(list1,55,"Arya"));
 	ASSERT_ZERO(list_insert(list1,22,"Bran"));
 	ASSERT_ZERO(list_insert(list1,11,"Rickon"));
 	ASSERT_ZERO(list_insert(list1,33,"Robb"));
+    printf("after insert\n");
 	ASSERT_TEST(list_size(list1) == numOfStarks);
-
+    printf("195\n");
 	ASSERT_ZERO(list_insert(list2,444,"Joffrey"));
 	ASSERT_ZERO(list_insert(list2,333,"Tommen"));
 	ASSERT_ZERO(list_insert(list2,111,"Myrcella"));
 	ASSERT_ZERO(list_insert(list2,222,"Tywin"));
 	ASSERT_TEST(list_size(list2) == numOfLannisters);
-
+    printf("201\n");
 	ASSERT_ZERO(list_insert(list3,444,"Joffrey"));
 	ASSERT_ZERO(list_insert(list3,111,"Myrcella"));
 	ASSERT_TEST(list_size(list3) == (numOfLannisters-2));
-
+    printf("205\n");
 	LIST_FOR_EACH(list1){
 		ASSERT_TEST(list_find(list1,allStarks[i]) == 1);
 	}
-
+    printf("209\n");
+    printf("11: %d\n",list_find(list1,11));
 	ASSERT_ZERO(list_remove(list1,33));
+    printf("11: %d\n",list_find(list1,11));
+
 	ASSERT_ZERO(list_remove(list1,11));
 	ASSERT_TEST(list_size(list1) == (numOfStarks-2));
 	ASSERT_TEST(list_find(list1,33) == 0);
 	ASSERT_TEST(list_find(list1,11) == 0);
-
+    
 	ASSERT_ZERO(list_insert(list1,11,"Rickon"));
 	ASSERT_ZERO(list_insert(list1,33,"Robb"));
 	ASSERT_TEST(list_find(list1,33) == 1);
@@ -232,7 +244,7 @@ bool testSequential1(){
 	ASSERT_TEST(list_size(arr3[2]) == 0); // empty list
 	
 
-	// free all allocated lists
+	 //free all allocated lists
 	for(int i=0;i<n1;++i)
 		list_free(arr1[i]);
 	for(int i=0;i<n2;++i)
@@ -303,12 +315,12 @@ bool testSequential2(){
 
 
 int main(){
-	RUN_TEST(testFreeErrors);
-	RUN_TEST(testSplitErrors);
-	RUN_TEST(testInsertErrors);
-	RUN_TEST(testRemoveErrors);
-	RUN_TEST(testFindErrors);
-	RUN_TEST(testSizeErrors);
+	//RUN_TEST(testFreeErrors);
+	//RUN_TEST(testSplitErrors);
+	//RUN_TEST(testInsertErrors);
+	//RUN_TEST(testRemoveErrors);
+	//RUN_TEST(testFindErrors);
+	//RUN_TEST(testSizeErrors);
 	RUN_TEST(testUpdateErrors);
 	RUN_TEST(testComputeErrors);
 	RUN_TEST(testBatchErrors);

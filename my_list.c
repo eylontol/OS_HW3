@@ -295,8 +295,8 @@ int list_find(linked_list_t* list, int key){
             unlock_node(head);
             goto out_unlock;
         }
-        unlock_node(head);
         if (head->next) lock_node(head->next);
+        unlock_node(head);
         head = head->next;
     }while (head);
     
@@ -472,13 +472,18 @@ int list_update(linked_list_t* list, int key, void* data)
     Node* curr;
     start_list_func(list, &valid);
     if (valid == FALSE) goto out;
+    if (!(list->head)) goto out_unlock;
     curr = list->head;
+    lock_node(curr);
     while (curr){
         if (curr->key == key){
             curr->data = data;
             res = 0;
+            unlock_node(curr);
             goto out_unlock;
         }
+        if (curr->next) lock_node(curr->next);
+        unlock_node(curr);
         curr = curr->next;
     }
 out_unlock:
